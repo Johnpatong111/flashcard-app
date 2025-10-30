@@ -1,6 +1,6 @@
 // app/page.tsx
 // Użycie aliasu @/ zamiast relatywnej ścieżki (../) jest bezpieczniejsze
-import DeckManager from './components/DeckManager';
+import DeckManager from '@/components/DeckManager';
 
 // TA LINIA ZMUSZA NEXT.JS DO PRAWIDŁOWEGO ROZPOZNANIA ŚCIEŻKI /
 export const dynamic = 'force-dynamic'; 

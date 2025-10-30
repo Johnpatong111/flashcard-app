@@ -22,9 +22,10 @@
         "name": "next"
       }
     ],
+    // 💡 POPRAWKA: Zmieniamy ścieżkę aliasu z "./src/*" na "./*"
     "paths": {
       "@/*": [
-        "./src/*"
+        "./*" 
       ]
     }
   },

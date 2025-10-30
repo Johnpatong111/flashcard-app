@@ -6,7 +6,7 @@ import Flashcard from './Flashcard';
 import AddFlashcardForm from './AddFlashcardForm'; 
 import { ChevronLeft, ChevronRight, BookOpen, Loader2, Shuffle, CheckCircle, X } from 'lucide-react'; 
 // POPRAWIONA ŚCIEŻKA (Użycie aliasu @/ dla stabilności po przeniesieniu folderów)
-import { supabase } from '../utils/supabaseClient';
+import { supabase } from '@/utils/supabaseClient';
 
 // Funkcja do mieszania tablicy (Algorytm Fishera-Yatesa)
 const shuffleArray = (array) => {
