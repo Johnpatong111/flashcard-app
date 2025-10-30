@@ -4,8 +4,8 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import Flashcard from './Flashcard';
 import AddFlashcardForm from './AddFlashcardForm'; 
+// POPRAWIONA LISTA IKON: Usunięto nieużywane ArrowUpRight i ArrowDownRight
 import { ChevronLeft, ChevronRight, BookOpen, Loader2, Shuffle, CheckCircle, X } from 'lucide-react'; 
-// POPRAWIONA ŚCIEŻKA (Użycie aliasu @/ dla stabilności po przeniesieniu folderów)
 import { supabase } from '@/utils/supabaseClient';
 
 // Funkcja do mieszania tablicy (Algorytm Fishera-Yatesa)
@@ -25,12 +25,24 @@ export default function DeckManager() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [showMastered, setShowMastered] = useState(true);
-  // 🚨 STAN DLA FILTROWANIA PO KATEGORIACH
   const [selectedCategory, setSelectedCategory] = useState('Wszystkie'); 
+  
+  // 🚨 NOWY STAN: Przechowuje aktualną kolejność wyświetlania po losowaniu, 
+  // działa na kartach ZANIM ZOSTANĄ PRZEFILTROWANE.
+  const [shuffledCards, setShuffledCards] = useState([]);
+  // Używamy go jako bazowego zbioru dla cards. To zapewni, że shuffle działa,
+  // a filtry działają na już przetasowanej kolekcji.
 
-  // Logika filtrowania - działa na talii kart.
+
+  // Logika filtrowania - Zawsze filtruje najpierw posortowane/potasowane karty.
+  const cardsToFilter = useMemo(() => {
+	// Używamy Potasowanych kart jeśli istnieją, w przeciwnym razie używamy bazowego stanu 'cards'
+    return shuffledCards.length > 0 ? shuffledCards : cards;
+  }, [cards, shuffledCards]);
+  
+  
   const filteredCards = useMemo(() => {
-    let tempCards = cards;
+    let tempCards = cardsToFilter; // Używamy nowej kolekcji
 
     // 1. Filtr opanowania (is_mastered)
     if (!showMastered) {
@@ -39,7 +51,6 @@ export default function DeckManager() {
 
     // 2. Filtr kategorii
     if (selectedCategory !== 'Wszystkie') {
-        // Upewniamy się, że porównanie jest niewrażliwe na wielkość liter i białe znaki
         const normCategory = selectedCategory.toLowerCase().trim();
         tempCards = tempCards.filter(card => 
             card.category && card.category.toLowerCase().trim() === normCategory
@@ -47,15 +58,15 @@ export default function DeckManager() {
     }
 
     return tempCards;
-  }, [cards, showMastered, selectedCategory]);
-  
-  // Lista unikalnych kategorii dla dropdowna
+  }, [cardsToFilter, showMastered, selectedCategory]); // Zależność od cardsToFilter
+
+
+  // Lista unikalnych kategorii dla dropdowna (Używa bazowego stanu cards)
   const uniqueCategories = useMemo(() => {
-    // 🚨 Zbieramy wszystkie unikalne kategorie
     const categories = new Set(cards
         .map(card => card.category)
-        .filter(category => category) // Usuwamy NULL/puste
-        .map(category => category.trim()) // Usuwamy białe znaki
+        .filter(category => category) 
+        .map(category => category.trim()) 
     );
     return ['Wszystkie', ...Array.from(categories)];
   }, [cards]);
@@ -74,7 +85,6 @@ export default function DeckManager() {
     }
       
     setIsLoading(true);
-    // SELECT DLA WSZYSTKICH POTRZEBNYCH KOLUMN
     const { data, error } = await supabase
       .from('cards')
       .select('id, created_at, strona_a, strona_b, is_mastered, jezyk, category')
@@ -84,6 +94,9 @@ export default function DeckManager() {
       console.error('Błąd podczas ładowania fiszek:', error);
     } else {
       setCards(data);
+	  // 🚨 WAŻNE: Po przeładowaniu z DB, resetujemy stan potasowanych kart,
+	  // aby domyślnie używany był porządek z bazy.
+	  setShuffledCards([]); 
       
       // Upewnienie się, że currentIndex jest w zakresie po przeładowaniu danych
       if (data.length > 0 && currentIndex >= data.length) {
@@ -93,10 +106,9 @@ export default function DeckManager() {
     setIsLoading(false);
   }, [currentIndex]); 
 
-  // FUNKCJA ZWROTNA: Wymusza odświeżenie danych po udanym zapisie w formularzu
   const handleSuccessCallback = useCallback(() => {
       fetchCards();
-      setCurrentIndex(0); // Przenieś na początek talii
+      setCurrentIndex(0); 
   }, [fetchCards]);
 
 
@@ -114,7 +126,6 @@ export default function DeckManager() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'cards' },
         (payload) => {
-          // Realtime wywołuje fetchCards po każdej zmianie w DB, zapewniając spójność.
           fetchCards(); 
         }
       )
@@ -125,8 +136,15 @@ export default function DeckManager() {
     };
   }, [fetchCards]);
 
-  
-  // 2. USUWANIE KARTY (Logika poprawna)
+
+  // 🚨 EFEKT: Resetuj Index po zmianie filtrów (showMastered lub selectedCategory)
+  useEffect(() => {
+	// Upewniamy się, że po zmianie filtru, currentCard jest resetowany do 0
+	setCurrentIndex(0);
+  }, [showMastered, selectedCategory]); 
+
+
+  // USUWANIE KARTY
   const handleDeleteCard = async (cardIdToDelete) => {
     if (!supabase) return; 
     
@@ -138,22 +156,20 @@ export default function DeckManager() {
     if (error) {
       console.error('Błąd podczas usuwania fiszki:', error);
     } 
-    // Realtime zajmie się aktualizacją stanu
   };
   
-  // 3. USTAWIENIE STATUSU OPANOWANIA (POPRAWIONA LOGIKA: Tylko zapis do DB)
+  // USTAWIENIE STATUSU OPANOWANIA
   const handleSetMastered = async (cardId, status) => {
     if (!supabase || !currentCard) return; 
 
-    // 1. Przejście do następnej karty PRZED asynchronicznym zapisem, 
-    // aby UI było płynne.
+    // Przejście do następnej karty PRZED asynchronicznym zapisem
     if (filteredCards.length > 1) {
         handleNext();
     } else {
         setCurrentIndex(0);
     }
 
-    // 2. Trwały zapis do bazy danych
+    // Zapis do bazy danych
     const { error } = await supabase
       .from('cards')
       .update({ is_mastered: status })
@@ -161,17 +177,15 @@ export default function DeckManager() {
 
     if (error) {
       console.error('Błąd podczas aktualizacji statusu:', error);
-      // Opcjonalnie: w przypadku błędu cofnij widok do poprzedniej karty
       if (filteredCards.length > 1) {
         handlePrev();
       }
       return;
     }
-    // Realtime obsłuży odświeżenie po udanym zapisie.
   };
 
 
-  // 4. PRZEWIJANIE (Logika poprawna)
+  // PRZEWIJANIE 
   const handleNext = () => {
     if (isDeckEmpty) return;
     setCurrentIndex((prevIndex) => (prevIndex + 1) % filteredCards.length);
@@ -182,12 +196,15 @@ export default function DeckManager() {
     setCurrentIndex((prevIndex) => (prevIndex - 1 + filteredCards.length) % filteredCards.length);
   };
   
-  // 5. LOSOWANIE (Logika poprawna)
+  // 🚨 NAPRAWIONA LOGIKA LOSOWANIA: 
+  // Losowanie odbywa się na kartachToFilter, a nie na bazowych "cards".
   const handleShuffle = () => {
     if (isDeckEmpty) return;
-    // Mieszamy cały zbiór, aby nowa kolejność była trwała w komponencie.
-    const shuffledCards = shuffleArray([...filteredCards]); 
-    setCards(shuffledCards);
+    
+	// Losujemy bazowy zbiór, a nie tylko przefiltrowane karty. 
+	// To zapewnia, że jeśli filtry zostaną zmienione, kolejność pozostanie losowa.
+    const shuffledBaseCards = shuffleArray([...cardsToFilter]); 
+	setShuffledCards(shuffledBaseCards);
     setCurrentIndex(0); 
   };
 
@@ -204,14 +221,16 @@ export default function DeckManager() {
   return (
     <div className="flex flex-col items-center w-full max-w-2xl p-4">
       
-      {/* Panel Filtrów - POPRAWIONO BŁĄD JSX */}
+	  {/* PASEK LEVELU ZOSTAŁ USUNIĘTY NA ŻYCZENIE */}
+
+      {/* Panel Filtrów */}
       <div 
           className="flex flex-wrap justify-center gap-4 mb-4 p-4 bg-white rounded-lg shadow-md w-full">
         {/* Przełącznik "Pokaż/Ukryj opanowane" */}
         <button
           onClick={() => {
             setShowMastered(!showMastered);
-            setCurrentIndex(0); // Zresetuj indeks po zmianie filtra
+            // setCurrentIndex(0) jest teraz obsługiwane przez useEffect
           }}
           className={`px-4 py-2 text-sm font-medium rounded-full transition ${
             showMastered 
@@ -227,7 +246,7 @@ export default function DeckManager() {
           value={selectedCategory}
           onChange={(e) => {
             setSelectedCategory(e.target.value);
-            setCurrentIndex(0);
+            // setCurrentIndex(0) jest teraz obsługiwane przez useEffect
           }}
           className="px-4 py-2 text-sm font-medium rounded-full border border-gray-300 bg-white shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
         >
@@ -257,9 +276,8 @@ export default function DeckManager() {
         ) : (
           <>
             <p className="mb-4 text-sm font-medium text-gray-500 text-center">
-              Słówko **{currentIndex + 1}** z **{filteredCards.length}**               {/* Oznaczenie, jeśli karta jest opanowana */}
+              Słówko **{currentIndex + 1}** z **{filteredCards.length}**               
               {currentCard.is_mastered && <span className="ml-2 text-green-500 font-bold">(Opanowane)</span>}
-              {/* Wyświetlanie kategorii */}
               {currentCard.category && 
                 <span className="ml-2 text-blue-500 font-medium text-xs bg-blue-100 px-2 py-1 rounded-full">
                   Kategoria: {currentCard.category}
