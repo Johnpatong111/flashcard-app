@@ -4,23 +4,9 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import Flashcard from './Flashcard';
 import AddFlashcardForm from './AddFlashcardForm'; 
-// Dodajemy ikony strzałek: ArrowUpRight, ArrowDownRight
-import { ChevronLeft, ChevronRight, BookOpen, Loader2, Shuffle, CheckCircle, X, ArrowUpRight, ArrowDownRight } from 'lucide-react'; 
+import { ChevronLeft, ChevronRight, BookOpen, Loader2, Shuffle, CheckCircle, X } from 'lucide-react'; 
+// POPRAWIONA ŚCIEŻKA (Użycie aliasu @/ dla stabilności po przeniesieniu folderów)
 import { supabase } from '@/utils/supabaseClient';
-
-
-// STAŁA: MAPA POZIOMÓW SŁOWNICTWA (Definicja poza komponentem)
-const LEVELS_MAP = [
-    { level: 'A0 (Start)', threshold: 0, nextThreshold: 100 },
-    { level: 'A1 (Basic)', threshold: 100, nextThreshold: 500 },
-    { level: 'A1+ (Plus)', threshold: 500, nextThreshold: 1000 },
-    { level: 'A2 (Elementary)', threshold: 1000, nextThreshold: 2000 },
-    { level: 'B1 (Intermediate)', threshold: 2000, nextThreshold: 4000 },
-    { level: 'B2 (Upper Intermediate)', threshold: 4000, nextThreshold: 8000 },
-    { level: 'C1 (Advanced)', threshold: 8000, nextThreshold: 15000 },
-    { level: 'C2 (Proficiency)', threshold: 15000, nextThreshold: 20000 }, 
-];
-
 
 // Funkcja do mieszania tablicy (Algorytm Fishera-Yatesa)
 const shuffleArray = (array) => {
@@ -39,119 +25,46 @@ export default function DeckManager() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [showMastered, setShowMastered] = useState(true);
+  // 🚨 STAN DLA FILTROWANIA PO KATEGORIACH
   const [selectedCategory, setSelectedCategory] = useState('Wszystkie'); 
-  
-  // Przechowuje aktualną kolejność wyświetlania (mieszaną lub domyślną)
-  const [displayOrder, setDisplayOrder] = useState([]); 
 
-  // --- STAN DLA PASKA POSTĘPU ---
-  const [initialMasteredCount, setInitialMasteredCount] = useState(0); 
-
-
-  // --- LOGIKA LEVEL SYSTEM ---
-
-  // totalMasteredCards używa initialMasteredCount dopóki cards nie są w pełni załadowane
-  const totalMasteredCards = useMemo(() => {
-    // Po pełnym załadowaniu kart, używamy dokładnej liczby
-    if (!isLoading && cards.length > 0) {
-        return cards.filter(card => card.is_mastered).length;
-    }
-    // Przed pełnym załadowaniem, używamy szybko pobranej lub optymistycznie zaktualizowanej liczby
-    return initialMasteredCount;
-  }, [cards, isLoading, initialMasteredCount]);
-
-
-  const playerLevel = useMemo(() => {
-    let currentLevelData = LEVELS_MAP[0];
-    
-    for (const levelData of LEVELS_MAP) {
-        if (totalMasteredCards >= levelData.threshold) {
-            currentLevelData = levelData;
-        } else {
-            break; 
-        }
-    }
-
-    const progressTotal = currentLevelData.nextThreshold - currentLevelData.threshold;
-    const progressMade = totalMasteredCards - currentLevelData.threshold;
-    const progressPercent = progressTotal > 0 ? (progressMade / progressTotal) * 100 : 100;
-    const wordsToNextLevel = currentLevelData.nextThreshold - totalMasteredCards;
-
-
-    return {
-        ...currentLevelData,
-        masteredCount: totalMasteredCards,
-        progressPercent: Math.min(100, progressPercent), 
-        wordsToNextLevel: wordsToNextLevel > 0 ? wordsToNextLevel : 0 
-    };
-  }, [totalMasteredCards]);
-
-
-  // Logika filtrowania - Zwraca TYLKO przefiltrowane karty
+  // Logika filtrowania - działa na talii kart.
   const filteredCards = useMemo(() => {
     let tempCards = cards;
 
+    // 1. Filtr opanowania (is_mastered)
     if (!showMastered) {
         tempCards = tempCards.filter(card => !card.is_mastered); 
     }
 
+    // 2. Filtr kategorii
     if (selectedCategory !== 'Wszystkie') {
+        // Upewniamy się, że porównanie jest niewrażliwe na wielkość liter i białe znaki
         const normCategory = selectedCategory.toLowerCase().trim();
-        // Zapewnia obsługę null lub undefined dla card.category
         tempCards = tempCards.filter(card => 
             card.category && card.category.toLowerCase().trim() === normCategory
         );
     }
-    // Zwracamy listę kart, ale ich kolejność ustalana jest przez displayOrder
+
     return tempCards;
   }, [cards, showMastered, selectedCategory]);
   
-  // Lista unikalnych kategorii
+  // Lista unikalnych kategorii dla dropdowna
   const uniqueCategories = useMemo(() => {
+    // 🚨 Zbieramy wszystkie unikalne kategorie
     const categories = new Set(cards
         .map(card => card.category)
-        .filter(category => category) 
-        .map(category => category.trim())
+        .filter(category => category) // Usuwamy NULL/puste
+        .map(category => category.trim()) // Usuwamy białe znaki
     );
     return ['Wszystkie', ...Array.from(categories)];
   }, [cards]);
-  
-  // Lista kart do faktycznego wyświetlania (filtrowana + posortowana/pomieszana)
-  const cardsToDisplay = useMemo(() => {
-    // Jeśli displayOrder jest pusty (na starcie), użyj filteredCards
-    if (displayOrder.length === 0) {
-      return filteredCards;
-    }
-    // Jeśli displayOrder istnieje, filtruj karty zgodnie z tym porządkiem
-    // i upewnij się, że karty pasują do bieżących filtrów
-    return displayOrder.filter(card => filteredCards.some(fCard => fCard.id === card.id));
-  }, [filteredCards, displayOrder]);
 
 
-  const isDeckEmpty = useMemo(() => cardsToDisplay.length === 0, [cardsToDisplay.length]);
-  const currentCard = isDeckEmpty ? null : cardsToDisplay[currentIndex];
+  const isDeckEmpty = useMemo(() => filteredCards.length === 0, [filteredCards.length]);
+  const currentCard = isDeckEmpty ? null : filteredCards[currentIndex];
 
-  // --- FUNKCJA: Szybkie pobranie tylko liczby opanowanych kart ---
-  const fetchMasteredCount = useCallback(async () => {
-    if (!supabase) return;
-    try {
-      const { count, error } = await supabase
-        .from('cards')
-        .select('*', { count: 'exact', head: true }) 
-        .eq('is_mastered', true); 
-
-      if (error) {
-        console.error('Błąd podczas liczenia opanowanych kart:', error);
-      } else {
-        setInitialMasteredCount(count || 0);
-      }
-    } catch (err) {
-      console.error("Błąd podczas łączenia w celu liczenia:", err);
-    } 
-  }, []);
-  // -------------------------------------------------------------------
-
-  // --- LOGIKA BAZY DANYCH (GŁÓWNE ŁADOWANIE FISZEK) ---
+  // --- LOGIKA BAZY DANYCH ---
 
   const fetchCards = useCallback(async () => {
     if (!supabase) {
@@ -161,36 +74,30 @@ export default function DeckManager() {
     }
       
     setIsLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('cards')
-        .select('id, created_at, strona_a, strona_b, is_mastered, jezyk, category')
-        .order('id', { ascending: false });
+    // SELECT DLA WSZYSTKICH POTRZEBNYCH KOLUMN
+    const { data, error } = await supabase
+      .from('cards')
+      .select('id, created_at, strona_a, strona_b, is_mastered, jezyk, category')
+      .order('id', { ascending: false });
 
-      if (error) {
-        console.error('Błąd podczas ładowania fiszek:', error);
-      } else {
-        setCards(data);
-        // Po pełnym załadowaniu, nadpisujemy initialMasteredCount na wypadek, gdyby Realtime nie zadziałał
-        setInitialMasteredCount(data.filter(card => card.is_mastered).length);
-        setDisplayOrder(data); 
-        
-        if (data.length > 0 && currentIndex >= data.length) {
-          setCurrentIndex(0);
-        }
+    if (error) {
+      console.error('Błąd podczas ładowania fiszek:', error);
+    } else {
+      setCards(data);
+      
+      // Upewnienie się, że currentIndex jest w zakresie po przeładowaniu danych
+      if (data.length > 0 && currentIndex >= data.length) {
+        setCurrentIndex(0);
       }
-    } catch (err) {
-      console.error("Krytyczny błąd podczas łączenia z Supabase:", err);
-    } finally {
-      setIsLoading(false); // ZAWSZE KOŃCZYMY ŁADOWANIE GŁÓWNE
     }
+    setIsLoading(false);
   }, [currentIndex]); 
 
+  // FUNKCJA ZWROTNA: Wymusza odświeżenie danych po udanym zapisie w formularzu
   const handleSuccessCallback = useCallback(() => {
       fetchCards();
-      fetchMasteredCount(); // Aktualizujemy licznik po dodaniu
-      setCurrentIndex(0); 
-  }, [fetchCards, fetchMasteredCount]);
+      setCurrentIndex(0); // Przenieś na początek talii
+  }, [fetchCards]);
 
 
   // USTAWIANIE SUBSKRYPCJI (REALTIME) 
@@ -199,11 +106,6 @@ export default function DeckManager() {
       fetchCards(); 
       return;
     }
-    
-    // PRIORYTET: Natychmiastowe pobranie liczby dla paska postępu
-    fetchMasteredCount(); 
-    
-    // Główne pobieranie fiszek
     fetchCards(); 
 
     const channel = supabase
@@ -212,8 +114,8 @@ export default function DeckManager() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'cards' },
         (payload) => {
+          // Realtime wywołuje fetchCards po każdej zmianie w DB, zapewniając spójność.
           fetchCards(); 
-          fetchMasteredCount(); // Aktualizuj licznik przy każdej zmianie z bazy
         }
       )
       .subscribe(); 
@@ -221,21 +123,10 @@ export default function DeckManager() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [fetchCards, fetchMasteredCount]);
-
-
-  // EFEKT: Resetuj Index i Kolejność Wyświetlania przy zmianie Filtrów
-  useEffect(() => {
-    // Zapewnia, że po zmianie filtru, currentCard jest resetowany do 0
-    setCurrentIndex(0);
-    
-    // Gdy filtry się zmieniają, resetujemy displayOrder do filteredCards
-    setDisplayOrder(filteredCards);
-    
-  }, [showMastered, selectedCategory, filteredCards.length]);
+  }, [fetchCards]);
 
   
-  // USUWANIE KARTY
+  // 2. USUWANIE KARTY (Logika poprawna)
   const handleDeleteCard = async (cardIdToDelete) => {
     if (!supabase) return; 
     
@@ -247,35 +138,22 @@ export default function DeckManager() {
     if (error) {
       console.error('Błąd podczas usuwania fiszki:', error);
     } 
+    // Realtime zajmie się aktualizacją stanu
   };
   
-  // USTAWIENIE STATUSU OPANOWANIA (POPRAWIONA LOGIKA OPTYMISTYCZNA)
+  // 3. USTAWIENIE STATUSU OPANOWANIA (POPRAWIONA LOGIKA: Tylko zapis do DB)
   const handleSetMastered = async (cardId, status) => {
     if (!supabase || !currentCard) return; 
 
-    const wasMastered = currentCard.is_mastered;
-    const isMasteredNow = status;
-    
-    // Optymistyczna aktualizacja licznika TYLKO jeśli status się zmienia
-    if (wasMastered !== isMasteredNow) {
-        setInitialMasteredCount(prevCount => prevCount + (isMasteredNow ? 1 : -1));
-    }
-    
-    // Natychmiastowa aktualizacja głównego stanu kart (dla UI)
-    setCards(prevCards => 
-      prevCards.map(card => 
-        card.id === cardId ? { ...card, is_mastered: status } : card
-      )
-    );
-
-    // Po aktualizacji statusu, przejdź do następnej karty
-    if (cardsToDisplay.length > 1) {
+    // 1. Przejście do następnej karty PRZED asynchronicznym zapisem, 
+    // aby UI było płynne.
+    if (filteredCards.length > 1) {
         handleNext();
     } else {
         setCurrentIndex(0);
     }
 
-    // Aktualizacja w bazie danych
+    // 2. Trwały zapis do bazy danych
     const { error } = await supabase
       .from('cards')
       .update({ is_mastered: status })
@@ -283,34 +161,37 @@ export default function DeckManager() {
 
     if (error) {
       console.error('Błąd podczas aktualizacji statusu:', error);
-      // W przypadku błędu, Realtime w tle powinien przywrócić poprawny stan
+      // Opcjonalnie: w przypadku błędu cofnij widok do poprzedniej karty
+      if (filteredCards.length > 1) {
+        handlePrev();
+      }
       return;
     }
+    // Realtime obsłuży odświeżenie po udanym zapisie.
   };
 
 
-  // PRZEWIJANIE (używa cardsToDisplay)
+  // 4. PRZEWIJANIE (Logika poprawna)
   const handleNext = () => {
     if (isDeckEmpty) return;
-    setCurrentIndex((prevIndex) => (prevIndex + 1) % cardsToDisplay.length);
+    setCurrentIndex((prevIndex) => (prevIndex + 1) % filteredCards.length);
   };
 
   const handlePrev = () => {
     if (isDeckEmpty) return;
-    setCurrentIndex((prevIndex) => (prevIndex - 1 + cardsToDisplay.length) % cardsToDisplay.length);
+    setCurrentIndex((prevIndex) => (prevIndex - 1 + filteredCards.length) % filteredCards.length);
   };
   
-  // LOSOWANIE (Aktualizuje tylko displayOrder, nie cards)
+  // 5. LOSOWANIE (Logika poprawna)
   const handleShuffle = () => {
     if (isDeckEmpty) return;
-    // Mieszamy TYLKO aktualnie wyświetlane, przefiltrowane karty
-    const shuffledDisplayOrder = shuffleArray([...cardsToDisplay]); 
-    setDisplayOrder(shuffledDisplayOrder);
+    // Mieszamy cały zbiór, aby nowa kolejność była trwała w komponencie.
+    const shuffledCards = shuffleArray([...filteredCards]); 
+    setCards(shuffledCards);
     setCurrentIndex(0); 
   };
 
 
-  // Warunek blokujący wyświetlanie jeśli trwa ładowanie GŁÓWNYCH fiszek
   if (isLoading && cards.length === 0) {
     return (
         <div className="flex justify-center items-center h-64 w-full max-w-2xl mt-8">
@@ -320,66 +201,17 @@ export default function DeckManager() {
     );
   }
 
-
   return (
     <div className="flex flex-col items-center w-full max-w-2xl p-4">
       
-      {/* PASEK LEVELU: ZAWSZE WIDOCZNY Z LEPSZYMI KOLORAMI I IKONAMI */}
-      <div className="w-full max-w-2xl mx-auto my-4 p-4 bg-gradient-to-br from-purple-50 to-indigo-100 rounded-xl shadow-md border border-indigo-200">
-        <div className="flex justify-between items-center mb-1">
-            <span className="text-sm font-bold text-purple-800 flex items-center">
-                🏅 Twój Poziom: <span className="font-extrabold ml-1">{playerLevel.level}</span>
-            </span>
-            <span className="text-xs text-indigo-700">
-                **{playerLevel.masteredCount}** słów opanowanych
-            </span>
-        </div>
-        {/* Zmieniony pasek postępu: kolor niebiesko-cyjanowy / procentowa szerokość */}
-        <div className="h-3 bg-gray-300 rounded-full overflow-hidden">
-            <div 
-                // NOWA ZMIANA KOLORU NA NIEBIESKO-CYJANOWY GRADIENT
-                className="h-full bg-gradient-to-r from-blue-400 to-cyan-600 transition-all duration-500" 
-                style={{ width: `${playerLevel.progressPercent}%` }} 
-            />
-        </div>
-        {/* Informacja o postępie w procentach (kolor dopasowany do paska) */}
-        <div className="flex justify-center">
-            <p className="text-sm font-bold text-blue-600 mt-2">
-                {Math.round(playerLevel.progressPercent)}% Postępu
-            </p>
-        </div>
-        
-        <p className="text-xs text-indigo-800 mt-1 text-right flex items-center justify-end">
-            {playerLevel.progressPercent < 100 
-                ? (
-                  <span className="flex items-center">
-                    {/* Ikona również zmieniona na niebieski, aby pasowała do paska */}
-                    <ArrowUpRight className="w-3 h-3 text-blue-600 mr-1" />
-                    Jeszcze **{playerLevel.wordsToNextLevel}** słów do poziomu 
-                    <span className="font-semibold ml-1">
-                      {LEVELS_MAP.find(l => l.threshold === playerLevel.nextThreshold)?.level || 'C2+'}
-                    </span>
-                  </span>
-                )
-                : (
-                  <span className="flex items-center text-green-700 font-semibold">
-                    <CheckCircle className="w-3 h-3 mr-1" />
-                    Gratulacje! Osiągnięto maksymalny poziom! 🚀
-                  </span>
-                )
-            }
-        </p>
-      </div>
-      {/* KONIEC PASEK LEVELU */}
-
-      {/* Panel Filtrów */}
+      {/* Panel Filtrów - POPRAWIONO BŁĄD JSX */}
       <div 
           className="flex flex-wrap justify-center gap-4 mb-4 p-4 bg-white rounded-lg shadow-md w-full">
         {/* Przełącznik "Pokaż/Ukryj opanowane" */}
         <button
           onClick={() => {
             setShowMastered(!showMastered);
-            // current Index zostanie zresetowany przez useEffect
+            setCurrentIndex(0); // Zresetuj indeks po zmianie filtra
           }}
           className={`px-4 py-2 text-sm font-medium rounded-full transition ${
             showMastered 
@@ -395,7 +227,7 @@ export default function DeckManager() {
           value={selectedCategory}
           onChange={(e) => {
             setSelectedCategory(e.target.value);
-            // current Index zostanie zresetowany przez useEffect
+            setCurrentIndex(0);
           }}
           className="px-4 py-2 text-sm font-medium rounded-full border border-gray-300 bg-white shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
         >
@@ -425,8 +257,9 @@ export default function DeckManager() {
         ) : (
           <>
             <p className="mb-4 text-sm font-medium text-gray-500 text-center">
-              Słówko <span className="font-bold">{currentIndex + 1}</span> z <span className="font-bold">{cardsToDisplay.length}</span>
+              Słówko **{currentIndex + 1}** z **{filteredCards.length}**               {/* Oznaczenie, jeśli karta jest opanowana */}
               {currentCard.is_mastered && <span className="ml-2 text-green-500 font-bold">(Opanowane)</span>}
+              {/* Wyświetlanie kategorii */}
               {currentCard.category && 
                 <span className="ml-2 text-blue-500 font-medium text-xs bg-blue-100 px-2 py-1 rounded-full">
                   Kategoria: {currentCard.category}
@@ -434,7 +267,7 @@ export default function DeckManager() {
               }
             </p>
             
-            {/* RENDEROWANIE FISZKI */}
+            {/* 1. RENDEROWANIE FISZKI */}
             <Flashcard 
                 card={currentCard} 
                 onDelete={handleDeleteCard} 
@@ -464,7 +297,7 @@ export default function DeckManager() {
               <button 
                 onClick={handlePrev}
                 className="flex items-center px-6 py-3 bg-gray-200 text-gray-700 rounded-full font-semibold transition hover:bg-gray-300 disabled:opacity-50"
-                disabled={cardsToDisplay.length <= 1}
+                disabled={filteredCards.length <= 1}
               >
                 <ChevronLeft className="w-5 h-5 mr-2" />
                 Poprzednia
@@ -473,7 +306,7 @@ export default function DeckManager() {
               <button 
                 onClick={handleNext}
                 className="flex items-center px-6 py-3 bg-indigo-600 text-white rounded-full font-semibold transition hover:bg-indigo-700 disabled:opacity-50"
-                disabled={cardsToDisplay.length <= 1}
+                disabled={filteredCards.length <= 1}
               >
                 Następna
                 <ChevronRight className="w-5 h-5 ml-2" />
@@ -485,10 +318,10 @@ export default function DeckManager() {
               <button
                 onClick={handleShuffle}
                 className="inline-flex items-center px-4 py-2 text-sm font-medium rounded-full text-indigo-600 border border-indigo-600 bg-white hover:bg-indigo-50 transition"
-                disabled={cardsToDisplay.length <= 1}
+                disabled={filteredCards.length <= 1}
               >
                 <Shuffle className="w-4 h-4 mr-2" />
-                Potasuj talię ({cardsToDisplay.length} kart)
+                Potasuj talię ({filteredCards.length} kart)
               </button>
             </div>
 
