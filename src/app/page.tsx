@@ -1,6 +1,9 @@
 // src/app/page.tsx (lub page.jsx)
 import DeckManager from '../components/DeckManager';
 
+// TA LINIA ZMUSZA NEXT.JS DO PRAWIDŁOWEGO ROZPOZNANIA ŚCIEŻKI /
+export const dynamic = 'force-dynamic'; 
+
 export default function HomePage() {
   return (
     <main className="flex min-h-screen flex-col items-center p-8 sm:p-24 bg-gray-50">
