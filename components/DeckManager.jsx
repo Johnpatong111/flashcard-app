@@ -74,7 +74,7 @@ export default function DeckManager() {
     }
       
     setIsLoading(true);
-    // 🟢 ZMIANA: USUWAMY KOLUMNĘ 'example' Z SELECTA
+    // SELECT DLA WSZYSTKICH POTRZEBNYCH KOLUMN
     const { data, error } = await supabase
       .from('cards')
       .select('id, created_at, strona_a, strona_b, is_mastered, jezyk, category')
@@ -84,14 +84,16 @@ export default function DeckManager() {
       console.error('Błąd podczas ładowania fiszek:', error);
     } else {
       setCards(data);
+      
+      // Upewnienie się, że currentIndex jest w zakresie po przeładowaniu danych
+      if (data.length > 0 && currentIndex >= data.length) {
+        setCurrentIndex(0);
+      }
     }
     setIsLoading(false);
-  }, []);
-  
-// ... pozostała logika handleSuccessCallback, useEffect, handleDeleteCard, handleSetMastered, handleNext, handlePrev, handleShuffle bez zmian ...
+  }, [currentIndex]); 
 
-
-  // 🟢 NOWA FUNKCJA: Wymusza odświeżenie danych po udanym zapisie w formularzu
+  // FUNKCJA ZWROTNA: Wymusza odświeżenie danych po udanym zapisie w formularzu
   const handleSuccessCallback = useCallback(() => {
       fetchCards();
       setCurrentIndex(0); // Przenieś na początek talii
@@ -112,6 +114,7 @@ export default function DeckManager() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'cards' },
         (payload) => {
+          // Realtime wywołuje fetchCards po każdej zmianie w DB, zapewniając spójność.
           fetchCards(); 
         }
       )
@@ -122,8 +125,6 @@ export default function DeckManager() {
     };
   }, [fetchCards]);
 
-  
-  // USUNIĘTO: Funkcja handleAddCard została usunięta, bo jest teraz w AddFlashcardForm.jsx
   
   // 2. USUWANIE KARTY (Logika poprawna)
   const handleDeleteCard = async (cardIdToDelete) => {
@@ -137,13 +138,22 @@ export default function DeckManager() {
     if (error) {
       console.error('Błąd podczas usuwania fiszki:', error);
     } 
+    // Realtime zajmie się aktualizacją stanu
   };
   
-  // 3. USTAWIENIE STATUSU OPANOWANIA (Logika poprawna)
+  // 3. USTAWIENIE STATUSU OPANOWANIA (POPRAWIONA LOGIKA: Tylko zapis do DB)
   const handleSetMastered = async (cardId, status) => {
-    if (!supabase) return;
+    if (!supabase || !currentCard) return; 
 
-    // Aktualizacja w bazie danych
+    // 1. Przejście do następnej karty PRZED asynchronicznym zapisem, 
+    // aby UI było płynne.
+    if (filteredCards.length > 1) {
+        handleNext();
+    } else {
+        setCurrentIndex(0);
+    }
+
+    // 2. Trwały zapis do bazy danych
     const { error } = await supabase
       .from('cards')
       .update({ is_mastered: status })
@@ -151,22 +161,13 @@ export default function DeckManager() {
 
     if (error) {
       console.error('Błąd podczas aktualizacji statusu:', error);
+      // Opcjonalnie: w przypadku błędu cofnij widok do poprzedniej karty
+      if (filteredCards.length > 1) {
+        handlePrev();
+      }
       return;
     }
-
-    // Optymistyczna aktualizacja stanu lokalnego
-    setCards(prevCards => 
-        prevCards.map(c => 
-            c.id === cardId ? { ...c, is_mastered: status } : c
-        )
-    );
-
-    // Przejście do następnej karty
-    if (filteredCards.length > 1) {
-        handleNext(); 
-    } else {
-        setTimeout(() => setCurrentIndex(0), 100); 
-    }
+    // Realtime obsłuży odświeżenie po udanym zapisie.
   };
 
 
@@ -185,7 +186,6 @@ export default function DeckManager() {
   const handleShuffle = () => {
     if (isDeckEmpty) return;
     // Mieszamy cały zbiór, aby nowa kolejność była trwała w komponencie.
-    // Zmienna filteredCards jest aktualizowana na podstawie cards, więc to jest OK.
     const shuffledCards = shuffleArray([...filteredCards]); 
     setCards(shuffledCards);
     setCurrentIndex(0); 
@@ -204,8 +204,9 @@ export default function DeckManager() {
   return (
     <div className="flex flex-col items-center w-full max-w-2xl p-4">
       
-      {/* Panel Filtrów (bez zmian) */}
-      <div className="flex flex-wrap justify-center gap-4 mb-4 p-4 bg-white rounded-lg shadow-md w-full">
+      {/* Panel Filtrów - POPRAWIONO BŁĄD JSX */}
+      <div 
+          className="flex flex-wrap justify-center gap-4 mb-4 p-4 bg-white rounded-lg shadow-md w-full">
         {/* Przełącznik "Pokaż/Ukryj opanowane" */}
         <button
           onClick={() => {
@@ -241,13 +242,13 @@ export default function DeckManager() {
 
       <div className="w-full">
         {isDeckEmpty ? (
-          // Widok pustej talii (bez zmian)
+          // Widok pustej talii
           <div className="w-full max-w-lg h-64 mx-auto p-6 flex flex-col items-center justify-center bg-yellow-50 text-yellow-800 rounded-xl border border-yellow-300 shadow-inner">
             <BookOpen className="w-8 h-8 mb-3" />
             <p className="font-semibold text-center">
                 {
                   showMastered 
-                  ? 'Talia fiszek jest pusta!' // Zmiana
+                  ? 'Talia fiszek jest pusta! Dodaj nowe karty poniżej.' 
                   : 'Talia do powtórki jest pusta. Wszystko opanowane! Gratulacje!'
                 }
               </p>
@@ -256,8 +257,7 @@ export default function DeckManager() {
         ) : (
           <>
             <p className="mb-4 text-sm font-medium text-gray-500 text-center">
-              Słówko **{currentIndex + 1}** z **{filteredCards.length}** {/* Zmiana */}
-              {/* Oznaczenie, jeśli karta jest opanowana */}
+              Słówko **{currentIndex + 1}** z **{filteredCards.length}**               {/* Oznaczenie, jeśli karta jest opanowana */}
               {currentCard.is_mastered && <span className="ml-2 text-green-500 font-bold">(Opanowane)</span>}
               {/* Wyświetlanie kategorii */}
               {currentCard.category && 
@@ -273,10 +273,8 @@ export default function DeckManager() {
                 onDelete={handleDeleteCard} 
                 onSetMastered={handleSetMastered} 
             /> 
-
-            {/* USUNIĘTO: Blok wyświetlający przykład użycia został usunięty stąd. */}
             
-            {/* Przyciski Statusu (bez zmian) */}
+            {/* Przyciski Statusu */}
             <div className="flex justify-center gap-4 w-full max-w-lg mx-auto mt-4">
                 <button
                     onClick={() => handleSetMastered(currentCard.id, true)}
@@ -294,7 +292,7 @@ export default function DeckManager() {
                 </button>
             </div>
             
-            {/* Przyciski Nawigacji (bez zmian) */}
+            {/* Przyciski Nawigacji */}
             <div className="flex justify-between w-full max-w-lg mx-auto mt-8">
               <button 
                 onClick={handlePrev}
@@ -315,7 +313,7 @@ export default function DeckManager() {
               </button>
             </div>
 
-            {/* Przycisk Losowania (bez zmian) */}
+            {/* Przycisk Losowania */}
             <div className="mt-4 text-center">
               <button
                 onClick={handleShuffle}
@@ -332,7 +330,6 @@ export default function DeckManager() {
       </div>
 
       {/* Sekcja Dodawania */}
-      {/* 🟢 ZMIENIONO: Dodano prop onSuccess, który wywoła ponowne ładowanie danych */}
       <AddFlashcardForm onSuccess={handleSuccessCallback} /> 
     </div>
   );
