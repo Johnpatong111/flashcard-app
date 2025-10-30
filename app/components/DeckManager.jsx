@@ -1,11 +1,12 @@
-// src/components/DeckManager.jsx (POPRAWIONY NAZWY NA "Słówko" i "Tłumaczenie")
+// components/DeckManager.jsx
 'use client'; 
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import Flashcard from './Flashcard';
 import AddFlashcardForm from './AddFlashcardForm'; 
 import { ChevronLeft, ChevronRight, BookOpen, Loader2, Shuffle, CheckCircle, X } from 'lucide-react'; 
-import { supabase } from '../utils/supabaseClient'; 
+// POPRAWIONA ŚCIEŻKA (Użycie aliasu @/ dla stabilności po przeniesieniu folderów)
+import { supabase } from '../utils/supabaseClient';
 
 // Funkcja do mieszania tablicy (Algorytm Fishera-Yatesa)
 const shuffleArray = (array) => {

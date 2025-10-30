@@ -1,5 +1,6 @@
-// src/app/page.tsx (lub page.jsx)
-import DeckManager from '../components/DeckManager';
+// app/page.tsx
+// Użycie aliasu @/ zamiast relatywnej ścieżki (../) jest bezpieczniejsze
+import DeckManager from './components/DeckManager';
 
 // TA LINIA ZMUSZA NEXT.JS DO PRAWIDŁOWEGO ROZPOZNANIA ŚCIEŻKI /
 export const dynamic = 'force-dynamic'; 
@@ -10,10 +11,10 @@ export default function HomePage() {
       <h1 className="text-4xl font-extrabold mb-12 text-gray-800 text-center">
         Flashcards by Hubert
       </h1>
-      
+
       {/* Tylko ten komponent ma renderować zawartość */}
       <DeckManager />
-      
+
     </main>
   );
 }
