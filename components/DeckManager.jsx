@@ -64,7 +64,7 @@ export default function DeckManager() {
   const isDeckEmpty = useMemo(() => filteredCards.length === 0, [filteredCards.length]);
   const currentCard = isDeckEmpty ? null : filteredCards[currentIndex];
 
-  // --- LOGIKA BAZY DANYCH (bez zmian) ---
+  // --- LOGIKA BAZY DANYCH ---
 
   const fetchCards = useCallback(async () => {
     if (!supabase) {
@@ -113,20 +113,8 @@ export default function DeckManager() {
   }, [fetchCards]);
 
   
-  // 1. DODAWANIE KARTY 
-  const handleAddCard = async (newCardData) => {
-    if (!supabase) return; // Zabezpieczenie
-    
-    // Wstawiamy cały obiekt newCardData
-    const { error } = await supabase
-      .from('cards')
-      .insert([newCardData]); 
-
-    if (error) {
-      console.error('Błąd podczas dodawania fiszki:', error);
-    } 
-  };
-
+  // USUNIĘTO: Funkcja handleAddCard została usunięta, bo jest teraz w AddFlashcardForm.jsx
+  
   // 2. USUWANIE KARTY (Logika poprawna)
   const handleDeleteCard = async (cardIdToDelete) => {
     if (!supabase) return; 
@@ -330,8 +318,9 @@ export default function DeckManager() {
         )}
       </div>
 
-      {/* Sekcja Dodawania (bez zmian) */}
-      <AddFlashcardForm onAdd={handleAddCard} /> 
+      {/* Sekcja Dodawania */}
+      {/* ZMIENIONO: Usunięto onAdd={handleAddCard} */}
+      <AddFlashcardForm /> 
     </div>
   );
 }

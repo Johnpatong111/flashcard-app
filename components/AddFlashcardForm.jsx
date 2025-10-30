@@ -3,21 +3,42 @@
 
 import { useState } from 'react';
 import { Plus } from 'lucide-react';
+// 1. IMPORT KLIENTA SUPABASE
+import { supabase } from '@/utils/supabaseClient'; 
 
-export default function AddFlashcardForm({ onAdd }) {
+// ZMIANA: Usunięto { onAdd } z propsów
+export default function AddFlashcardForm() {
   const [question, setQuestion] = useState('');
   const [answer, setAnswer] = useState('');
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => { // DODANO: async
     e.preventDefault();
     if (!question.trim() || !answer.trim()) {
       alert('Wprowadź pytanie i odpowiedź.');
       return;
     }
     
-    // Wywołanie funkcji z DeckManager, która zapisuje do Supabase
-    onAdd(question, answer); 
-    
+    // 2. WBUDOWANA LOGIKA ZAPISU DO SUPABASE
+    const { data, error } = await supabase
+        .from('cards') // Nazwa Twojej tabeli
+        .insert([
+            { 
+                strona_a: question, // 'Słowo'
+                strona_b: answer,   // 'Tłumaczenie'
+                // opcjonalnie: język: 'Hiszpański'
+            }
+        ]);
+
+    if (error) {
+        console.error('BŁĄD ZAPISU DO SUPABASE:', error);
+        // TUTAJ WYSKAKUJE BŁĄD 403 FORBIDDEN, JEŚLI RLS JEST BLOKOWANE
+        alert('❌ Błąd zapisu na Vercel! Sprawdź błędy w konsoli przeglądarki i RLS.');
+        return;
+    }
+    
+    // Sukces!
+    console.log('Fiszka pomyślnie dodana:', data);
+    
     // Resetowanie pól formularza
     setQuestion('');
     setAnswer('');
@@ -25,13 +46,11 @@ export default function AddFlashcardForm({ onAdd }) {
 
   return (
     <div className="w-full max-w-lg mt-12 p-6 bg-white border border-gray-200 rounded-xl shadow-lg">
-      {/* Nagłówek - POPRAWA: zmieniono text-black-900 na poprawny text-black */}
       <h2 className="text-xl font-semibold mb-4 text-black">Dodaj Nową Fiszkę</h2>
       <form onSubmit={handleSubmit} className="space-y-4">
         
         {/* Słowo */}
         <div>
-          {/* Etykieta Słowo - POPRAWA: zmieniono text-black-900 na poprawny text-black */}
           <label htmlFor="question" className="block text-sm font-medium text-black mb-1">
             Słowo
           </label>
@@ -42,14 +61,12 @@ export default function AddFlashcardForm({ onAdd }) {
             rows="2"
             required
             className="w-full border border-gray-300 rounded-lg p-3 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 resize-none text-black" 
-            /* DODANO: text-black, aby wpisywany tekst był czarny */
             placeholder="Słowo po Polsku"
           />
         </div>
 
         {/* Tłumaczenie */}
         <div>
-          {/* Etykieta Tłumaczenie - POPRAWA: zmieniono text-black-900 na poprawny text-black */}
           <label htmlFor="answer" className="block text-sm font-medium text-black mb-1">
             Tłumaczenie
           </label>
@@ -60,7 +77,6 @@ export default function AddFlashcardForm({ onAdd }) {
             rows="2"
             required
             className="w-full border border-gray-300 rounded-lg p-3 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 resize-none text-black"
-            /* DODANO: text-black, aby wpisywany tekst był czarny */
             placeholder="Znaczenie Słowa po Hiszpańsku"
           />
         </div>
