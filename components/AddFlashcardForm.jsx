@@ -6,8 +6,8 @@ import { Plus } from 'lucide-react';
 // 1. IMPORT KLIENTA SUPABASE
 import { supabase } from '@/utils/supabaseClient'; 
 
-// ZMIANA: Usunięto { onAdd } z propsów
-export default function AddFlashcardForm() {
+// ZMIANA 1: Akceptowanie propa 'onSuccess'
+export default function AddFlashcardForm({ onSuccess }) {
   const [question, setQuestion] = useState('');
   const [answer, setAnswer] = useState('');
 
@@ -19,26 +19,30 @@ export default function AddFlashcardForm() {
     }
     
     // 2. WBUDOWANA LOGIKA ZAPISU DO SUPABASE
-    const { data, error } = await supabase
-        .from('cards') // Nazwa Twojej tabeli
-        .insert([
-            { 
-                strona_a: question, // 'Słowo'
-                strona_b: answer,   // 'Tłumaczenie'
-                // opcjonalnie: język: 'Hiszpański'
-            }
-        ]);
+    const { data, error } = await supabase
+        .from('cards') // Nazwa Twojej tabeli
+        .insert([
+            { 
+                strona_a: question, // 'Słowo'
+                strona_b: answer,   // 'Tłumaczenie'
+                // opcjonalnie: język: 'Hiszpański'
+            }
+        ]);
 
-    if (error) {
-        console.error('BŁĄD ZAPISU DO SUPABASE:', error);
-        // TUTAJ WYSKAKUJE BŁĄD 403 FORBIDDEN, JEŚLI RLS JEST BLOKOWANE
-        alert('❌ Błąd zapisu na Vercel! Sprawdź błędy w konsoli przeglądarki i RLS.');
-        return;
+    if (error) {
+        console.error('BŁĄD ZAPISU DO SUPABASE:', error);
+        alert('❌ Błąd zapisu na Vercel! Sprawdź błędy w konsoli przeglądarki i RLS.');
+        return;
+    }
+    
+    // Sukces!
+    console.log('Fiszka pomyślnie dodana:', data);
+    
+    // ZMIANA 2: Wywołanie funkcji onSuccess, która poinformuje DeckManager
+    if (onSuccess) {
+        onSuccess();
     }
-    
-    // Sukces!
-    console.log('Fiszka pomyślnie dodana:', data);
-    
+    
     // Resetowanie pól formularza
     setQuestion('');
     setAnswer('');

@@ -87,6 +87,13 @@ export default function DeckManager() {
     }
     setIsLoading(false);
   }, []);
+  
+  // 🟢 NOWA FUNKCJA: Wymusza odświeżenie danych po udanym zapisie w formularzu
+  const handleSuccessCallback = useCallback(() => {
+      fetchCards();
+      setCurrentIndex(0); // Przenieś na początek talii
+  }, [fetchCards]);
+
 
   // USTAWIANIE SUBSKRYPCJI (REALTIME) 
   useEffect(() => {
@@ -319,8 +326,8 @@ export default function DeckManager() {
       </div>
 
       {/* Sekcja Dodawania */}
-      {/* ZMIENIONO: Usunięto onAdd={handleAddCard} */}
-      <AddFlashcardForm /> 
+      {/* 🟢 ZMIENIONO: Dodano prop onSuccess, który wywoła ponowne ładowanie danych */}
+      <AddFlashcardForm onSuccess={handleSuccessCallback} /> 
     </div>
   );
 }
