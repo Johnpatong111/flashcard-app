@@ -74,7 +74,7 @@ export default function DeckManager() {
     }
       
     setIsLoading(true);
-    // POPRAWKA SELECT: Dodajemy 'category' oraz upewniamy się, że nazwy kolumn się zgadzają: jezyk, is_mastered
+    // 🟢 ZMIANA: USUWAMY KOLUMNĘ 'example' Z SELECTA
     const { data, error } = await supabase
       .from('cards')
       .select('id, created_at, strona_a, strona_b, is_mastered, jezyk, category')
@@ -87,12 +87,15 @@ export default function DeckManager() {
     }
     setIsLoading(false);
   }, []);
-  
-  // 🟢 NOWA FUNKCJA: Wymusza odświeżenie danych po udanym zapisie w formularzu
-  const handleSuccessCallback = useCallback(() => {
-      fetchCards();
-      setCurrentIndex(0); // Przenieś na początek talii
-  }, [fetchCards]);
+  
+// ... pozostała logika handleSuccessCallback, useEffect, handleDeleteCard, handleSetMastered, handleNext, handlePrev, handleShuffle bez zmian ...
+
+
+  // 🟢 NOWA FUNKCJA: Wymusza odświeżenie danych po udanym zapisie w formularzu
+  const handleSuccessCallback = useCallback(() => {
+      fetchCards();
+      setCurrentIndex(0); // Przenieś na początek talii
+  }, [fetchCards]);
 
 
   // USTAWIANIE SUBSKRYPCJI (REALTIME) 
@@ -201,7 +204,7 @@ export default function DeckManager() {
   return (
     <div className="flex flex-col items-center w-full max-w-2xl p-4">
       
-      {/* Panel Filtrów */}
+      {/* Panel Filtrów (bez zmian) */}
       <div className="flex flex-wrap justify-center gap-4 mb-4 p-4 bg-white rounded-lg shadow-md w-full">
         {/* Przełącznik "Pokaż/Ukryj opanowane" */}
         <button
@@ -238,7 +241,7 @@ export default function DeckManager() {
 
       <div className="w-full">
         {isDeckEmpty ? (
-          // Widok pustej talii
+          // Widok pustej talii (bez zmian)
           <div className="w-full max-w-lg h-64 mx-auto p-6 flex flex-col items-center justify-center bg-yellow-50 text-yellow-800 rounded-xl border border-yellow-300 shadow-inner">
             <BookOpen className="w-8 h-8 mb-3" />
             <p className="font-semibold text-center">
@@ -264,11 +267,14 @@ export default function DeckManager() {
               }
             </p>
             
+            {/* 1. RENDEROWANIE FISZKI */}
             <Flashcard 
                 card={currentCard} 
                 onDelete={handleDeleteCard} 
                 onSetMastered={handleSetMastered} 
             /> 
+
+            {/* USUNIĘTO: Blok wyświetlający przykład użycia został usunięty stąd. */}
             
             {/* Przyciski Statusu (bez zmian) */}
             <div className="flex justify-center gap-4 w-full max-w-lg mx-auto mt-4">
