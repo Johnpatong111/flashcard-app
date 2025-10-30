@@ -25,12 +25,12 @@ export default function AddFlashcardForm({ onAdd }) {
 
   return (
     <div className="w-full max-w-lg mt-12 p-6 bg-white border border-gray-200 rounded-xl shadow-lg">
-      <h2 className="text-xl font-semibold mb-4 text-gray-800">Dodaj Nową Fiszkę</h2>
+      <h2 className="text-xl font-semibold mb-4 text-black-900">Dodaj Nową Fiszkę</h2>
       <form onSubmit={handleSubmit} className="space-y-4">
         
         {/* Słowo */}
         <div>
-          <label htmlFor="question" className="block text-sm font-medium text-gray-700 mb-1">
+          <label htmlFor="question" className="block text-sm font-medium text-black-900 mb-1">
             Słowo
           </label>
           <textarea
@@ -46,7 +46,7 @@ export default function AddFlashcardForm({ onAdd }) {
 
         {/* Tłumaczenie */}
         <div>
-          <label htmlFor="answer" className="block text-sm font-medium text-gray-700 mb-1">
+          <label htmlFor="answer" className="block text-sm font-medium text-black-900 mb-1">
             Tłumaczenie
           </label>
           <textarea
