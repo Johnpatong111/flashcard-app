@@ -190,7 +190,7 @@ export default function DeckManager({ currentUserId }) {
         }
     };
 
-    // Logika useMemo... (bez zmian)
+    // Logika useMemo...
     const uniqueCategories = useMemo(() => {
         const categories = new Set(cards
             .map(card => card.category)
@@ -240,7 +240,7 @@ export default function DeckManager({ currentUserId }) {
     const isDeckEmpty = useMemo(() => displayCards.length === 0, [displayCards.length]);
     const currentCard = isDeckEmpty ? null : displayCards[currentIndex];
 
-    // Logika handleReview (bez zmian)
+    // Logika handleReview
     const handleReview = async (cardId, quality) => {
         if (!supabase || !currentCard || !currentCard.user_cards_id) return; 
 
@@ -309,7 +309,7 @@ export default function DeckManager({ currentUserId }) {
     };
 
 
-    // PRZEWIJANIE i LOSOWANIE (bez zmian)
+    // PRZEWIJANIE i LOSOWANIE
     const handleNext = () => {
         if (isDeckEmpty) return;
         setCurrentIndex((prevIndex) => (prevIndex + 1) % displayCards.length);
@@ -457,9 +457,9 @@ export default function DeckManager({ currentUserId }) {
                                     Łatwe
                                 </button>
                             </div>
-                          )}
+                        )}
                         
-                        {/* Przyciski Nawigacji i Losowanie (bez zmian) */}
+                        {/* Przyciski Nawigacji i Losowanie */}
                         <div className="flex justify-between w-full max-w-lg mx-auto mt-8">
                             <button 
                                 onClick={handlePrev}

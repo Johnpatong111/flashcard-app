@@ -132,10 +132,9 @@ export default function AddFlashcardForm({ onSuccess, currentUserId }) {
                             onChange={(e) => setCategory(e.target.value)}
                             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                         >
-                            <option>Podstawowe Słownictwo</option>
-                            <option>Gramatyka</option>
-                            <option>Częste Zwroty</option>
-                            <option>IT</option>
+                            <option>Wszystkie Kategorie</option>
+                            <option>idiomy</option>
+                            <option>czasowniki</option>
                         </select>
                     </div>
                     <div className="flex-1">
@@ -148,7 +147,6 @@ export default function AddFlashcardForm({ onSuccess, currentUserId }) {
                         >
                             <option>Angielski</option>
                             <option>Hiszpański</option>
-                            <option>Niemiecki</option>
                         </select>
                     </div>
                 </div>
@@ -156,7 +154,7 @@ export default function AddFlashcardForm({ onSuccess, currentUserId }) {
                 {/* Strona A i B */}
                 <div className="flex gap-4">
                     <div className="flex-1">
-                        <label htmlFor="stronaA" className="block text-sm font-medium text-gray-700">Strona A (Np. Polskie słowo/zwrot/idiom)</label>
+                        <label htmlFor="stronaA" className="block text-sm font-medium text-gray-700">Polskie słowo/zwrot/idiom</label>
                         <input
                             type="text"
                             id="stronaA"
@@ -168,7 +166,7 @@ export default function AddFlashcardForm({ onSuccess, currentUserId }) {
                         />
                     </div>
                     <div className="flex-1">
-                        <label htmlFor="stronaB" className="block text-sm font-medium text-gray-700">Strona B (Odpowiednik w języku docelowym)</label>
+                        <label htmlFor="stronaB" className="block text-sm font-medium text-gray-700">Tłumaczenie</label>
                         <input
                             type="text"
                             id="stronaB"
